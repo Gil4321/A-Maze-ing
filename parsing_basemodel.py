@@ -29,7 +29,7 @@ class ValidConfig(BaseModel):
                 )
         if parsed_size < 1:
             raise ParsingError(
-                f"Value {size} cannot be < 1 for WIDTH and HEIGHT"
+                f"Value {parsed_size} cannot be < 1 for WIDTH and HEIGHT"
                 )
         return parsed_size
 
@@ -60,7 +60,7 @@ class ValidConfig(BaseModel):
         elif maze_type == "False":
             return False
         raise ParsingError(
-            f"Value '{type}' invalid. Maze type must be True, "
+            f"Value '{maze_type}' invalid. Maze type must be True, "
             "False or left empty for key 'PERFECT'"
             )
 
@@ -128,11 +128,14 @@ def fetch_config(file_name: str) -> ValidConfig:
                     key, value = split_content
                     if key not in keys:
                         raise ParsingError(
-                            f"Key '{key}' not valid. "
+                            f"Key: '{key}' not valid.\n"
                             f"List of valid keys: {keys}"
                             )
                     elif key in keys and key in config.keys():
-                        raise ParsingError(f"Key '{key}' found twice")
+                        raise ParsingError(
+                            f"Key: '{key}' found twice, "
+                            "cannot have duplicate keys"
+                            )
                     config[key] = value.rstrip()
                 content = file.readline()
             if len(keys) != len(config.keys()):
