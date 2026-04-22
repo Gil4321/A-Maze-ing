@@ -14,7 +14,7 @@ class ValidConfig(BaseModel):
     EXIT: tuple[int, int]
     OUTPUT_FILE: str
     PERFECT: bool
-    SEED: float
+    SEED: str | None
     CONFIG_FILE: str
 
     @field_validator("WIDTH", "HEIGHT", mode="before")
@@ -35,7 +35,7 @@ class ValidConfig(BaseModel):
 
     @field_validator("ENTRY", "EXIT", mode="before")
     @classmethod
-    def format_coordinates(cls, coordinates: str) -> tuple[str, str]:
+    def validate_coordinates(cls, coordinates: str) -> tuple[str, str]:
         split_coordinates = coordinates.split(",")
         if len(split_coordinates) != 2:
             raise ParsingError(
@@ -66,19 +66,13 @@ class ValidConfig(BaseModel):
 
     @field_validator("SEED", mode="before")
     @classmethod
-    def validate_seed(cls, seed: str) -> float:
+    def validate_seed(cls, seed: str) -> str | None:
         if seed == "":
-            return float(random.randrange(999999))
-        try:
-            parsed_seed = float(seed)
-        except Exception:
-            raise ParsingError("SEED must be and int, a float or left empty")
-        if parsed_seed < 0:
-            parsed_seed = parsed_seed * -1
-        return parsed_seed
+            return None
+        return seed
 
     @model_validator(mode="after")
-    def validate_file_name(self) -> BaseModel:
+    def validate_file_name(self) -> 'ValidConfig':
         if not self.OUTPUT_FILE.endswith('.txt'):
             raise ParsingError("Output file must end with '.txt'")
         elif self.OUTPUT_FILE == self.CONFIG_FILE:
@@ -90,15 +84,25 @@ class ValidConfig(BaseModel):
                 "'ENTRY' and 'EXIT' cannot have the same coordinates"
                 )
         x, y = self.ENTRY
-        if x + 1 > self.WIDTH:
-            raise ParsingError("Coordinate 'x' of key 'ENTRY' is out of range")
-        elif y + 1 > self.HEIGHT:
-            raise ParsingError("Coordinate 'y' of key 'ENTRY' is out of range")
+        if x + 1 > self.WIDTH or x < 0:
+            raise ParsingError(
+                "Coordinate 'x' of key 'ENTRY' is out of range. "
+                "x must be < WIDTH and >= 0"
+                )
+        elif y + 1 > self.HEIGHT or y < 0:
+            raise ParsingError(
+                "Coordinate 'y' of key 'ENTRY' is out of range. "
+                "y must be < HEIGHT and >= 0")
         x, y = self.EXIT
-        if x + 1 > self.WIDTH:
-            raise ParsingError("Coordinate 'x' of key 'EXIT' is out of range")
-        elif y + 1 > self.HEIGHT:
-            raise ParsingError("Coordinate 'y' of key 'EXIT' is out of range")
+        if x + 1 > self.WIDTH or x < 0:
+            raise ParsingError(
+                "Coordinate 'x' of key 'EXIT' is out of range. "
+                "x must be < WIDTH and >= 0"
+                )
+        elif y + 1 > self.HEIGHT or y < 0:
+            raise ParsingError(
+                "Coordinate 'y' of key 'EXIT' is out of range. "
+                "y must be < HEIGHT and >= 0")
         return self
 
 
@@ -144,7 +148,7 @@ def fetch_config(file_name: str) -> ValidConfig:
                     if key not in config.keys():
                         missing.append(key)
                 raise ParsingError(f"Keys: {missing} missing from config file")
-            config = ValidConfig(
+            valid_model = ValidConfig(
                 WIDTH=config['WIDTH'],
                 HEIGHT=config['HEIGHT'],
                 ENTRY=config['ENTRY'],
@@ -154,7 +158,7 @@ def fetch_config(file_name: str) -> ValidConfig:
                 SEED=config['SEED'],
                 CONFIG_FILE=file_name
                 )
-        return config
+        return valid_model
     except Exception as e:
         raise (e)
 
@@ -162,7 +166,6 @@ def fetch_config(file_name: str) -> ValidConfig:
 if __name__ == "__main__":
     try:
         config = fetch_config("config.txt")
-        config = config.model_dump()
         print(config)
     except Exception as e:
         print(e)
