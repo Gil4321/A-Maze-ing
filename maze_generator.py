@@ -1,7 +1,22 @@
 from parsing_basemodel import fetch_config
 import random
 import sys
+from enum import Enum
 sys.setrecursionlimit(99999999)
+
+
+class Directions(Enum):
+    NORTH = (0, -1)
+    SOUTH = (0, 1)
+    EAST = (1, 0)
+    WEST = (-1, 0)
+
+
+class WallValues(Enum):
+    TOP = 1
+    BOT = 4
+    EAST = 2
+    WEST = 8
 
 
 class MazeError(Exception):
@@ -29,6 +44,7 @@ class MazeGenerator:
         self.height = height
         self.entry = entry
         self.exit = exit
+        self.path: list[tuple[int, int]] = []
         self.layout: list[list[Cell]] = self.initialize_layout(width, height)
         if width >= 8 and height >= 6:
             self.add_42_pattern()
@@ -148,31 +164,64 @@ class MazeGenerator:
         x = 0
         while x < self.width:
             y = 0
-            x_range = [i for i in range(x, x + 3)]
+            x2 = x + 3
+            if x2 > self.width:
+                x2 = self.width
+            x_range = [i for i in range(x, x2)]
             while y < self.height:
-                y_range = [i for i in range(y, y + 3)]
+                y2 = y + 3
+                if y2 > self.height:
+                    y2 = self.height
+                y_range = [i for i in range(y, y2)]
                 self.find_random_valid_cell(x_range, y_range)
                 y = y + 3
             x = x + 3
 
     def find_random_valid_cell(self, x_range, y_range) -> None:
         found_valid_cell = False
-        cells_coordinates = []
+        coordinates_values = []
         for x in x_range:
             for y in y_range:
-                cells_coordinates.append((x, y))
-        while cells_coordinates and found_valid_cell is False:
-            coordinates = random.choice(cells_coordinates)
-            cells_coordinates.remove(coordinates)
-            found_valid_cell = self.destroy_random_wall(coordinates)
+                coordinates_values.append((x, y))
+        while coordinates_values and found_valid_cell is False:
+            coordinates = random.choice(coordinates_values)
+            coordinates_values.remove(coordinates)
+            try:
+                x, y = coordinates
+                cell: Cell = self.layout[x][y]
+                if cell.walls != 15:
+                    found_valid_cell = self.destroy_random_wall(cell)
+            except IndexError:
+                pass
 
-    def destroy_random_wall(self, coordinates: tuple[int, int]) -> bool:
+    def valid_neighbor(self, cell: Cell, wall: int) -> bool:
+        x, y = cell.coordinates
         try:
-            x, y = coordinates
-            cell: Cell = self.layout[x][y]
+            if wall == 8:
+                neighbor = self.layout[x - 1][y]
+            elif wall == 4:
+                neighbor = self.layout[x][y + 1]
+            elif wall == 2:
+                neighbor = self.layout[x + 1][y]
+            else:
+                neighbor = self.layout[x][y - 1]
+            if neighbor.walls == 15:
+                return False
+            cell.walls -= wall
+            if wall >= 4:
+                neighbor.walls -= wall // 4
+            else:
+                neighbor.walls -= wall * 4
+            return True
+        except IndexError:
+            return False
+
+    def destroy_random_wall(self, cell: Cell) -> bool:
+        try:
             if cell.walls == 15:
                 return False
             walls = [8, 4, 2, 1]
+            x, y = cell.coordinates
             if x == 0:
                 walls.remove(8)
             if x == self.width - 1:
@@ -184,9 +233,9 @@ class MazeGenerator:
             while walls:
                 wall = random.choice(walls)
                 walls.remove(wall)
-                if (wall & cell.walls) and wall <= cell.walls:
-                    cell.walls -= wall
-                    return True
+                if wall & cell.walls:
+                    if self.valid_neighbor(cell, wall):
+                        return True
             return False
         except IndexError:
             return False
@@ -226,7 +275,7 @@ class BFS:
         while self.path_list:
             for path in self.path_list:
                 if path[-1] == self.maze.exit:
-                    return path
+                    self.maze.path = path
                 x, y = path[-1]
                 cell: Cell = self.maze.layout[x][y]
                 cell.visited = True
@@ -254,6 +303,8 @@ def main() -> None:
     try:
         if len(sys.argv) > 2:
             raise ValueError("Too many arguments")
+        elif len(sys.argv) == 1:
+            raise ValueError("No arguments given")
         file = sys.argv[1]
         config = fetch_config(file)
         random.seed(config.SEED)
@@ -265,7 +316,7 @@ def main() -> None:
             config.PERFECT
             )
         bfs = BFS(maze)
-        print(bfs.solve_maze())
+        bfs.solve_maze()
     except Exception as e:
         print(e)
 
