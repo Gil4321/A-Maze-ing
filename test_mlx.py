@@ -1,11 +1,12 @@
 from mlx import Mlx
 import os
-import random
 import math
+from maze_generator import Maze, regen_maze
+
 
 app = Mlx()
 mlx_ptr = app.mlx_init()
-WIN_W, WIN_H = 3160, 2116
+WIN_W, WIN_H = 2000, 2000
 win_ptr = app.mlx_new_window(mlx_ptr, WIN_W, WIN_H, "A-Mazing")
 
 
@@ -15,15 +16,17 @@ def close_win(param): os._exit(0)
 def key_hook(keycode, param):
     if keycode == 65307:
         os._exit(0)
-    elif keycode == 49:
+    if keycode == 49:
         destroymaze()
-        drawmaze()
-    elif keycode == 50:
+        generated_maze = regen_maze()
+        drawmaze(generated_maze)
+    if keycode == 50:
         destroymaze()
-        draw_maze_iso()
-    elif keycode == 51:
+        generated_maze = regen_maze()
+        draw_maze_iso(generated_maze)
+    if keycode == 51:
+        destroymaze()
         leprechaun()
-    print(f"Keycode: {keycode}")
 
 
 app.mlx_hook(win_ptr, 33, 0, close_win, None)
@@ -31,20 +34,20 @@ app.mlx_key_hook(win_ptr, key_hook, None)
 
 cell_variants = {
     0:  {"N": False, "S": False, "E": False, "W": False},
-    1:  {"N": False, "S": False, "E": False, "W": True},
+    1:  {"N": True,  "S": False, "E": False, "W": False},
     2:  {"N": False, "S": False, "E": True,  "W": False},
-    3:  {"N": False, "S": False, "E": True,  "W": True},
+    3:  {"N": True,  "S": False, "E": True,  "W": False},
     4:  {"N": False, "S": True,  "E": False, "W": False},
-    5:  {"N": False, "S": True,  "E": False, "W": True},
+    5:  {"N": True,  "S": True,  "E": False, "W": False},
     6:  {"N": False, "S": True,  "E": True,  "W": False},
-    7:  {"N": False, "S": True,  "E": True,  "W": True},
-    8:  {"N": True,  "S": False, "E": False, "W": False},
+    7:  {"N": True,  "S": True,  "E": True,  "W": False},
+    8:  {"N": False, "S": False, "E": False, "W": True},
     9:  {"N": True,  "S": False, "E": False, "W": True},
-    10: {"N": True,  "S": False, "E": True,  "W": False},
+    10: {"N": False, "S": False, "E": True,  "W": True},
     11: {"N": True,  "S": False, "E": True,  "W": True},
-    12: {"N": True,  "S": True,  "E": False, "W": False},
+    12: {"N": False, "S": True,  "E": False, "W": True},
     13: {"N": True,  "S": True,  "E": False, "W": True},
-    14: {"N": True,  "S": True,  "E": True,  "W": False},
+    14: {"N": False, "S": True,  "E": True,  "W": True},
     15: {"N": True,  "S": True,  "E": True,  "W": True},
 }
 
@@ -189,45 +192,46 @@ def draw_cell_iso(gx, gy, size, cell, ox, oy, wall_height):
         draw_wall_face(TR, BR, wall_height, color)
 
 
-def drawmaze():
-    global maze
-    maze = [[cell_variants[random.randint(0, 15)]
-             for _ in range(150)] for _ in range(150)]
-    size = 12
-    for y in range(150):
-        for x in range(150):
-            draw_cell(x, y, size, maze[y][x])
-    app.mlx_put_image_to_window(mlx_ptr, win_ptr, img_ptr, 0, 0)
+def drawmaze(generated_maze: Maze):
+
+    size = 20
+    print("test")
+    print(generated_maze.height)
+    for y in range(generated_maze.height):
+        for x in range(generated_maze.width):
+            print(generated_maze.output[y])
+            cell_value = generated_maze.output[y][x]
+            print(cell_value)
+            draw_cell(x, y, size, cell_variants[cell_value])
+
+    app.mlx_put_image_to_window(
+        mlx_ptr, win_ptr, img_ptr, WIN_W // 2 - generated_maze.width * size // 2, WIN_H // 2 - generated_maze.height * size // 2)
 
 
-def draw_maze_iso():
-    global maze
-    cols, rows = 72, 72
-    size = 40       # taille d'une cellule en grille
-    wall_height = 18        # hauteur des murs en pixels écran
-    # centrer le labyrinthe horizontalement
+def draw_maze_iso(generated_maze: Maze):
+    size = 40
+    wall_height = 18
+
     ox = WIN_W // 2
-    oy = 200                # marge haute
+    oy = 200
 
-    maze = [[cell_variants[random.randint(0, 15)]
-             for _ in range(cols)] for _ in range(rows)]
-
-    # ordre diagonal = vague iso naturelle
     order = []
-    for d in range(cols + rows - 1):
-        for x in range(max(0, d - rows + 1), min(d + 1, cols)):
+    for d in range(generated_maze.width + generated_maze.height - 1):
+        for x in range(max(0, d - generated_maze.height + 1), min(d + 1, generated_maze.width)):
             y = d - x
-            if 0 <= y < rows:
+            if 0 <= y < generated_maze.height:
                 order.append((x, y))
 
     for (x, y) in order:
-        draw_cell_iso(x, y, size, maze[y][x], ox, oy, wall_height)
+        cell_value = generated_maze.output[y][x]
+        draw_cell_iso(
+            x, y, size, cell_variants[cell_value], ox, oy, wall_height)
 
     app.mlx_put_image_to_window(mlx_ptr, win_ptr, img_ptr, 0, 0)
 
 
 def leprechaun():
-    img, w, h = app.mlx_xpm_file_to_image(mlx_ptr, "leprechaun-adam.xpm")
+    img, w, h = app.mlx_xpm_file_to_image(mlx_ptr, "theomartleprehaun.xpm")
     app.mlx_put_image_to_window(mlx_ptr, win_ptr, img, 0, 0)
     app.mlx_loop(mlx_ptr)
 
