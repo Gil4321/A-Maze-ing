@@ -1,12 +1,12 @@
 from mlx import Mlx
 import os
 import math
-from maze_generator import Maze, regen_maze
+from maze_generator import MazeGenerator, regen_maze
 
 
 app = Mlx()
 mlx_ptr = app.mlx_init()
-WIN_W, WIN_H = 2000, 2000
+WIN_W, WIN_H = 3840, 2160
 win_ptr = app.mlx_new_window(mlx_ptr, WIN_W, WIN_H, "A-Mazing")
 
 
@@ -88,10 +88,11 @@ def blend_color(color, t):
 
 
 def draw_cell(x, y, size, cell):
+    # fonction pour le chemin afficher/supprimer et afficher et exit
     px = x * size
     py = y * size
     color = rainbow(x, y)
-    thickness = 4
+    thickness = 10
 
     if cell["N"]:
         for t in range(thickness):
@@ -192,23 +193,20 @@ def draw_cell_iso(gx, gy, size, cell, ox, oy, wall_height):
         draw_wall_face(TR, BR, wall_height, color)
 
 
-def drawmaze(generated_maze: Maze):
-
-    size = 20
-    print("test")
-    print(generated_maze.height)
+def drawmaze(generated_maze: MazeGenerator):
+    size = 50
     for y in range(generated_maze.height):
         for x in range(generated_maze.width):
-            print(generated_maze.output[y])
-            cell_value = generated_maze.output[y][x]
-            print(cell_value)
+            cell_value = generated_maze.layout[x][y].walls
             draw_cell(x, y, size, cell_variants[cell_value])
 
     app.mlx_put_image_to_window(
         mlx_ptr, win_ptr, img_ptr, WIN_W // 2 - generated_maze.width * size // 2, WIN_H // 2 - generated_maze.height * size // 2)
+    print("Done !")
+    app.mlx_loop(mlx_ptr)
 
 
-def draw_maze_iso(generated_maze: Maze):
+def draw_maze_iso(generated_maze: MazeGenerator):
     size = 40
     wall_height = 18
 
@@ -223,7 +221,7 @@ def draw_maze_iso(generated_maze: Maze):
                 order.append((x, y))
 
     for (x, y) in order:
-        cell_value = generated_maze.output[y][x]
+        cell_value = generated_maze.layout[x][y].walls
         draw_cell_iso(
             x, y, size, cell_variants[cell_value], ox, oy, wall_height)
 
@@ -243,7 +241,3 @@ def destroymaze():
 
 def loop_hook(param):
     return 0
-
-
-app.mlx_loop_hook(mlx_ptr, loop_hook, None)
-app.mlx_loop(mlx_ptr)
