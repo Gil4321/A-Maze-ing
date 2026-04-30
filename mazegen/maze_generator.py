@@ -1,5 +1,3 @@
-from parsing_basemodel import fetch_config, ValidConfig
-from typing import Callable
 import random
 import sys
 sys.setrecursionlimit(99999999)
@@ -18,14 +16,17 @@ class Cell:
 
 
 class MazeGenerator:
+
     def __init__(
             self,
             width: int,
             height: int,
             entry: tuple[int, int],
             exit: tuple[int, int],
-            perfect: bool
+            perfect: bool,
+            seed: str | None
     ) -> None:
+        random.seed(seed)
         self.width = width
         self.height = height
         self.entry = entry
@@ -40,6 +41,8 @@ class MazeGenerator:
         self.create_perfect_maze(self.layout[x][y])
         if perfect is False:
             self.create_imperfect_maze()
+        bfs = BFS(self)
+        bfs.solve_maze()
 
     @staticmethod
     def initialize_layout(x: int, y: int) -> list[list[Cell]]:
@@ -162,7 +165,11 @@ class MazeGenerator:
                 y = y + 3
             x = x + 3
 
-    def find_random_valid_cell(self, x_range, y_range) -> None:
+    def find_random_valid_cell(
+            self,
+            x_range: list[int],
+            y_range: list[int]
+            ) -> None:
         found_valid_cell = False
         coordinates_values = []
         for x in x_range:
@@ -262,90 +269,3 @@ class BFS:
                     self.path_list.append(path + [coordinates])
                 self.path_list.remove(path)
         raise MazeError("No path to exit found")
-
-
-def cardinal_path(maze: MazeGenerator) -> str:
-    path = ""
-    all_coordinates = ([maze.entry] + maze.path + [maze.exit])
-    for i in range(len(all_coordinates) - 1):
-        x1, y1 = all_coordinates[i]
-        x2, y2 = all_coordinates[i + 1]
-        if x1 > x2:
-            path += 'W'
-        elif x1 < x2:
-            path += 'E'
-        elif y1 > y2:
-            path += 'N'
-        elif y1 < y2:
-            path += 'S'
-    return (path + '\n')
-
-
-def generate_output_file(
-        maze: MazeGenerator,
-        output: str,
-        cardinal_path: str
-        ) -> None:
-    with open(output, "w") as file:
-        print(maze.height)
-        print(maze.width)
-        for y in range(maze.height):
-            row = [format(
-                maze.layout[x][y].walls, 'X') for x in range(maze.width)]
-            for walls in row:
-                file.write(walls)
-            file.write('\n')
-        file.write('\n' + str(maze.entry[0]) + ',' + str(maze.entry[1]))
-        file.write('\n' + str(maze.exit[0]) + ',' + str(maze.exit[1]))
-        file.write('\n' + cardinal_path)
-
-
-def maze_regenerator(config: ValidConfig) -> Callable:
-    def regen_maze() -> None:
-        try:
-            random.seed(None)
-            maze = MazeGenerator(
-                config.WIDTH,
-                config.HEIGHT,
-                config.ENTRY,
-                config.EXIT,
-                config.PERFECT
-            )
-            bfs = BFS(maze)
-            bfs.solve_maze()
-            generate_output_file(maze, config.OUTPUT_FILE, cardinal_path(maze))
-#           mlx
-        except Exception as e:
-            print(e)
-    return regen_maze
-
-
-def main() -> None:
-    try:
-        if len(sys.argv) > 2:
-            raise ValueError("Too many arguments")
-        elif len(sys.argv) == 1:
-            raise ValueError("No arguments given")
-        file = sys.argv[1]
-        config = fetch_config(file)
-        random.seed(config.SEED)
-        maze = MazeGenerator(
-            config.WIDTH,
-            config.HEIGHT,
-            config.ENTRY,
-            config.EXIT,
-            config.PERFECT
-        )
-        bfs = BFS(maze)
-        bfs.solve_maze()
-        generate_output_file(maze, config.OUTPUT_FILE, cardinal_path(maze))
-
-#       mlx
-    except FileNotFoundError:
-        print(f"File {file} not found")
-    except Exception as e:
-        print(e)
-
-
-if __name__ == "__main__":
-    main()
