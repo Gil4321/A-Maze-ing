@@ -336,6 +336,7 @@ def main() -> None:
         bfs.solve_maze()
         from test_mlx import drawmaze
         drawmaze(maze)
+        return
     except Exception as e:
         print(e)
 

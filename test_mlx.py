@@ -2,12 +2,13 @@ from mlx import Mlx
 import os
 import math
 from maze_generator import MazeGenerator, regen_maze
-
+import random
 
 app = Mlx()
 mlx_ptr = app.mlx_init()
 WIN_W, WIN_H = 3840, 2160
 win_ptr = app.mlx_new_window(mlx_ptr, WIN_W, WIN_H, "A-Mazing")
+generated_maze =
 
 
 def close_win(param): os._exit(0)
@@ -27,6 +28,11 @@ def key_hook(keycode, param):
     if keycode == 51:
         destroymaze()
         leprechaun()
+    if keycode == 52:
+        generated_maze = regen_maze()
+        drawpath(generated_maze)
+    if keycode == 53:
+        clearpath(generated_maze)
 
 
 app.mlx_hook(win_ptr, 33, 0, close_win, None)
@@ -87,12 +93,11 @@ def blend_color(color, t):
 # flat
 
 
-def draw_cell(x, y, size, cell):
+def draw_cell(x, y, size, cell, color):
     # fonction pour le chemin afficher/supprimer et afficher et exit
     px = x * size
     py = y * size
-    color = rainbow(x, y)
-    thickness = 10
+    thickness = 3
 
     if cell["N"]:
         for t in range(thickness):
@@ -111,12 +116,132 @@ def draw_cell(x, y, size, cell):
             for i in range(size + thickness):
                 put_pixel(px + size + t, py + i, color)
 
+
+def draw_cell_42(x, y, size, cell):
+    # fonction pour le chemin afficher/supprimer et afficher et exit
+    px = x * size
+    py = y * size
+    color = 0xFFFFFFFF
+    thickness = 3
+
+    for t in range(thickness):
+        for i in range(size + thickness):
+            put_pixel(px + i, py + t, color)
+
+    for t in range(thickness):
+        for i in range(size + thickness):
+            put_pixel(px + i, py + size + t, color)
+
+    for t in range(thickness):
+        for i in range(size + thickness):
+            put_pixel(px + t, py + i, color)
+
+    for t in range(thickness):
+        for i in range(size + thickness):
+            put_pixel(px + size + t, py + i, color)
+
+
+def draw_cell_path(x, y, size):
+    color = rainbow(x // size, y // size)
+    for t in range(size + 1):
+        for i in range(size + size // 2):
+            put_pixel(x - size // 2 + i, y - t, color)
+            put_pixel(x - size // 2 + i, y + t, color)
+            put_pixel(x - t, y - size // 2 + i, color)
+            put_pixel(x + t, y - size // 2 + i, color)
+
+
+def draw_cell_path_black(x, y, size):
+    color = 0x000000
+    for t in range(size + 1):
+        for i in range(size + size // 2):
+            put_pixel(x - size // 2 + i, y - t, color)
+            put_pixel(x - size // 2 + i, y + t, color)
+            put_pixel(x - t, y - size // 2 + i, color)
+            put_pixel(x + t, y - size // 2 + i, color)
+
 # iso
 
 
 def to_iso(gx, gy, hw, hh, ox, oy):
     return (int(ox + (gx - gy) * hw),
             int(oy + (gx + gy) * hh))
+
+
+def drawpath_iso(generated_maze, size, ox, oy, wall_height, path_coords):
+    hw = size // 2
+    hh = size // 4
+    for y in range(generated_maze.height):
+        for x in range(generated_maze.width):
+            if (x, y) in path_coords:
+                # On dessine un losange plein légèrement lumineux sur ces cellules
+                TL = to_iso(x,   y,   hw, hh, ox, oy)
+                TR = to_iso(x-1, y,   hw, hh, ox, oy)
+                BR = to_iso(x-1, y-1, hw, hh, ox, oy)
+                BL = to_iso(x,   y-1, hw, hh, ox, oy)
+
+                color = rainbow(x, y)
+                points = [TL, TR, BR, BL]
+                y_min = min(p[1] for p in points)
+                y_max = max(p[1] for p in points)
+                edges = [
+                    (TL, TR), (TR, BR), (BR, BL), (BL, TL)
+                ]
+
+                def x_on_seg_42(xa, ya, xb, yb, scan_y):
+                    if ya == yb:
+                        return None
+                    t = (scan_y - ya) / (yb - ya)
+                    if 0.0 <= t <= 1.0:
+                        return xa + t * (xb - xa)
+                    return None
+                for scan_y in range(y_min, y_max + 1):
+                    xs = [x_on_seg_42(xa, ya, xb, yb, scan_y)
+                          for (xa, ya), (xb, yb) in edges]
+                    xs = [v for v in xs if v is not None]
+                    if len(xs) < 2:
+                        continue
+                    for px in range(int(min(xs)), int(max(xs)) - 1):
+                        put_pixel(px, scan_y, color)
+
+
+def draw_42_iso(generated_maze, size, ox, oy, wall_height):
+    """Dessine les cellules walls==15 en iso (équivalent draw_42 pour la vue flat)."""
+    hw = size // 2
+    hh = size // 4
+    for y in range(generated_maze.height):
+        for x in range(generated_maze.width):
+            if generated_maze.layout[x][y].walls == 15:
+                # On dessine un losange plein légèrement lumineux sur ces cellules
+                TL = to_iso(x,   y,   hw, hh, ox, oy)
+                TR = to_iso(x-1, y,   hw, hh, ox, oy)
+                BR = to_iso(x-1, y-1, hw, hh, ox, oy)
+                BL = to_iso(x,   y-1, hw, hh, ox, oy)
+
+                color = 0xFFFFFFFF  # blanc comme draw_42 flat
+                # Remplissage du losange par scanline
+                points = [TL, TR, BR, BL]
+                y_min = min(p[1] for p in points)
+                y_max = max(p[1] for p in points)
+                edges = [
+                    (TL, TR), (TR, BR), (BR, BL), (BL, TL)
+                ]
+
+                def x_on_seg_42(xa, ya, xb, yb, scan_y):
+                    if ya == yb:
+                        return None
+                    t = (scan_y - ya) / (yb - ya)
+                    if 0.0 <= t <= 1.0:
+                        return xa + t * (xb - xa)
+                    return None
+                for scan_y in range(y_min, y_max + 1):
+                    xs = [x_on_seg_42(xa, ya, xb, yb, scan_y)
+                          for (xa, ya), (xb, yb) in edges]
+                    xs = [v for v in xs if v is not None]
+                    if len(xs) < 2:
+                        continue
+                    for px in range(int(min(xs)), int(max(xs)) + 1):
+                        put_pixel(px, scan_y, color)
 
 
 def draw_wall_face(p0, p1, wall_height, color):
@@ -174,14 +299,13 @@ def draw_wall_face(p0, p1, wall_height, color):
             put_pixel(x, y, blend_color(color, t))
 
 
-def draw_cell_iso(gx, gy, size, cell, ox, oy, wall_height):
+def draw_cell_iso(gx, gy, size, cell, ox, oy, wall_height, color):
     hw = size // 2
     hh = size // 4
     TL = to_iso(gx,   gy,   hw, hh, ox, oy)
     TR = to_iso(gx+1, gy,   hw, hh, ox, oy)
     BR = to_iso(gx+1, gy+1, hw, hh, ox, oy)
     BL = to_iso(gx,   gy+1, hw, hh, ox, oy)
-    color = rainbow(gx, gy)
 
     if cell["N"]:
         draw_wall_face(TL, TR, wall_height, color)
@@ -193,23 +317,60 @@ def draw_cell_iso(gx, gy, size, cell, ox, oy, wall_height):
         draw_wall_face(TR, BR, wall_height, color)
 
 
-def drawmaze(generated_maze: MazeGenerator):
-    size = 50
+def draw_42(generated_maze: MazeGenerator):
+    size = 15
     for y in range(generated_maze.height):
         for x in range(generated_maze.width):
             cell_value = generated_maze.layout[x][y].walls
-            draw_cell(x, y, size, cell_variants[cell_value])
+            if cell_value == 15:
+                draw_cell_42(x, y, size, cell_variants[cell_value])
 
     app.mlx_put_image_to_window(
         mlx_ptr, win_ptr, img_ptr, WIN_W // 2 - generated_maze.width * size // 2, WIN_H // 2 - generated_maze.height * size // 2)
+
+
+def drawmaze(generated_maze: MazeGenerator):
+    size = 15
+    color = rainbow(random.randint(0, 255), random.randint(0, 255))
+    drawpath(generated_maze)
+    for y in range(generated_maze.height):
+        for x in range(generated_maze.width):
+            cell_value = generated_maze.layout[x][y].walls
+            draw_cell(x, y, size, cell_variants[cell_value], color)
+    app.mlx_put_image_to_window(
+        mlx_ptr, win_ptr, img_ptr, WIN_W // 2 - generated_maze.width * size // 2, WIN_H // 2 - generated_maze.height * size // 2)
     print("Done !")
+    app.mlx_string_put(
+        mlx_ptr, win_ptr, WIN_W // 2 - len("Press 1 ro regenerate, 2 for isometric view, 3 for leprechaun, 4 for path, Esc to quit") * 5,  WIN_H // 2 - generated_maze.height * size // 2 - size * 2, 0xFFFFFFFF, "Press 1 ro regenerate, 2 for isometric view, 3 for leprechaun, 4 for path, Esc to quit")
+    draw_42(generated_maze)
+
     app.mlx_loop(mlx_ptr)
 
 
-def draw_maze_iso(generated_maze: MazeGenerator):
-    size = 40
-    wall_height = 18
+def putpath(x, y, size, offset_x, offset_y):
+    px = x * size + offset_x + size // 2
+    py = y * size + offset_y + size // 2
+    draw_cell_path(px, py, size // 2)
 
+
+def drawpath(generated_maze: MazeGenerator):
+    size = 15
+    offset_x = 0
+    offset_y = 0
+    path_coords = generated_maze.path
+    print(f"set coordinates: {path_coords}")
+    print(f"list coordinates: {generated_maze.path}")
+    for y in range(generated_maze.height):
+        for x in range(generated_maze.width):
+            if (x, y) in path_coords:
+                print(f"Drawing path cell at ({x}, {y})")
+                putpath(x, y, size, offset_x, offset_y)
+
+
+def draw_maze_iso(generated_maze: MazeGenerator):
+    size = 50
+    wall_height = 18
+    color = rainbow(random.randint(0, 255), random.randint(0, 255))
     ox = WIN_W // 2
     oy = 200
 
@@ -223,13 +384,25 @@ def draw_maze_iso(generated_maze: MazeGenerator):
     for (x, y) in order:
         cell_value = generated_maze.layout[x][y].walls
         draw_cell_iso(
-            x, y, size, cell_variants[cell_value], ox, oy, wall_height)
-
+            x, y, size, cell_variants[cell_value], ox, oy, wall_height, color)
+    drawpath_iso(generated_maze, size, ox, oy,
+                 wall_height, generated_maze.path)
+    draw_42_iso(generated_maze, size, ox, oy, wall_height)
     app.mlx_put_image_to_window(mlx_ptr, win_ptr, img_ptr, 0, 0)
+    print("Done !")
+    app.mlx_string_put(
+        mlx_ptr, win_ptr,
+        WIN_W // 2 -
+        len("Press 1 flat, 2 iso, 3 leprechaun, 4 path, Esc quit") * 5,
+        20,
+        0xFFFFFFFF,
+        "Press 1 flat, 2 iso, 3 leprechaun, 4 path, Esc quit")
+    app.mlx_loop(mlx_ptr)
 
 
 def leprechaun():
-    img, w, h = app.mlx_xpm_file_to_image(mlx_ptr, "theomartleprehaun.xpm")
+    img, w, h = app.mlx_xpm_file_to_image(mlx_ptr, random.choice(
+        ["leprechaun-adam.xpm", "theomartleprehaun.xpm"]))
     app.mlx_put_image_to_window(mlx_ptr, win_ptr, img, 0, 0)
     app.mlx_loop(mlx_ptr)
 
@@ -237,6 +410,27 @@ def leprechaun():
 def destroymaze():
     app.mlx_clear_window(mlx_ptr, win_ptr)
     data_addr[:] = b'\x00' * (WIN_W * WIN_H * BPP)
+
+
+def putpathblack(x, y, size, offset_x, offset_y):
+    px = x * size + offset_x + size // 2
+    py = y * size + offset_y + size // 2
+    draw_cell_path_black(px, py, size // 2)
+
+
+def clearpath(generated_maze: MazeGenerator):
+
+    size = 15
+    offset_x = 0
+    offset_y = 0
+    path_coords = generated_maze.path
+    print(f"set coordinates: {path_coords}")
+    print(f"list coordinates: {generated_maze.path}")
+    for y in range(generated_maze.height):
+        for x in range(generated_maze.width):
+            if (x, y) in path_coords:
+                print(f"remooving path cell at ({x}, {y})")
+                putpathblack(x, y, size, offset_x, offset_y)
 
 
 def loop_hook(param):
