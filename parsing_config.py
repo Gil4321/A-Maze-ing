@@ -32,7 +32,6 @@ class ValidConfig(BaseModel):
                 "Values cannot be < 1 for"
                 "WIDTH and HEIGHT. They must be >= 1"
             )
-        print(type(parsed_size))
         return parsed_size
 
     @field_validator("ENTRY", "EXIT", mode="before")
