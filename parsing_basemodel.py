@@ -28,7 +28,8 @@ class ValidConfig(BaseModel):
             )
         if parsed_size < 1:
             raise ParsingError(
-                f"Value {parsed_size} cannot be < 1 for WIDTH and HEIGHT"
+                f"Value {parsed_size} cannot be < 1."
+                "WIDTH and HEIGHT must be >= 1"
             )
         return parsed_size
 
@@ -106,64 +107,54 @@ class ValidConfig(BaseModel):
 
 
 def fetch_config(file_name: str) -> ValidConfig:
-    try:
-        keys = [
-            "WIDTH",
-            "HEIGHT",
-            "ENTRY",
-            "EXIT",
-            "OUTPUT_FILE",
-            "PERFECT",
-            "SEED"
-        ]
-        config: dict = {}
-        with open(file_name, "r") as file:
+    keys = [
+        "WIDTH",
+        "HEIGHT",
+        "ENTRY",
+        "EXIT",
+        "OUTPUT_FILE",
+        "PERFECT",
+        "SEED"
+    ]
+    config: dict = {}
+    with open(file_name, "r") as file:
+        content = file.readline()
+        while content:
+            if content.startswith(('#', '\n')):
+                pass
+            else:
+                split_content = content.split("=")
+                if len(split_content) != 2:
+                    raise ParsingError(
+                        f"Wrong format for '{content}'. try 'KEY=value'"
+                    )
+                key, value = split_content
+                if key not in keys:
+                    raise ParsingError(
+                        f"Key: '{key}' not valid.\n"
+                        f"List of valid keys: {keys}"
+                    )
+                elif key in keys and key in config.keys():
+                    raise ParsingError(
+                        f"Key: '{key}' found twice, "
+                        "cannot have duplicate keys"
+                    )
+                config[key] = value.rstrip()
             content = file.readline()
-            while content:
-                if content.startswith(('#', '\n')):
-                    pass
-                else:
-                    split_content = content.split("=")
-                    if len(split_content) != 2:
-                        raise ParsingError(
-                            f"Wrong format for '{content}'. try 'KEY=value'"
-                        )
-                    key, value = split_content
-                    if key not in keys:
-                        raise ParsingError(
-                            f"Key: '{key}' not valid.\n"
-                            f"List of valid keys: {keys}"
-                        )
-                    elif key in keys and key in config.keys():
-                        raise ParsingError(
-                            f"Key: '{key}' found twice, "
-                            "cannot have duplicate keys"
-                        )
-                    config[key] = value.rstrip()
-                content = file.readline()
-            if len(keys) != len(config.keys()):
-                missing = []
-                for key in keys:
-                    if key not in config.keys():
-                        missing.append(key)
-                raise ParsingError(f"Keys: {missing} missing from config file")
-            valid_model = ValidConfig(
-                WIDTH=config['WIDTH'],
-                HEIGHT=config['HEIGHT'],
-                ENTRY=config['ENTRY'],
-                EXIT=config['EXIT'],
-                OUTPUT_FILE=config['OUTPUT_FILE'],
-                PERFECT=config['PERFECT'],
-                SEED=config['SEED'],
-                CONFIG_FILE=file_name
-            )
-        return valid_model
-    except FileNotFoundError:
-        raise ParsingError(f"File: '{file_name}' not found")
-    except Exception:
-        raise ParsingError("Unexpected error occured during parsing")
-
-
-if __name__ == "__main__":
-    config = fetch_config("config.txt")
-    print(config)
+        if len(keys) != len(config.keys()):
+            missing = []
+            for key in keys:
+                if key not in config.keys():
+                    missing.append(key)
+            raise ParsingError(f"Keys: {missing} missing from config file")
+        valid_model = ValidConfig(
+            WIDTH=config['WIDTH'],
+            HEIGHT=config['HEIGHT'],
+            ENTRY=config['ENTRY'],
+            EXIT=config['EXIT'],
+            OUTPUT_FILE=config['OUTPUT_FILE'],
+            PERFECT=config['PERFECT'],
+            SEED=config['SEED'],
+            CONFIG_FILE=file_name
+        )
+    return valid_model
