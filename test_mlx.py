@@ -4,10 +4,13 @@ import os
 import math
 import random
 import numpy as np
+from typing import Any, Callable, TypedDict, TYPE_CHECKING
+if TYPE_CHECKING:
+    from maze_generator import MazeGenerator
 
 app = Mlx()
 mlx_ptr = app.mlx_init()
-WIN_W, WIN_H = 2160, 1440
+WIN_W, WIN_H = 3840, 2160
 win_ptr = app.mlx_new_window(mlx_ptr, WIN_W, WIN_H, "A-Mazing")
 
 img_maze = app.mlx_new_image(mlx_ptr, WIN_W, WIN_H)
@@ -23,7 +26,16 @@ leprechaun = 0
 np_maze = np.frombuffer(data_maze, dtype=np.uint8).reshape((WIN_H, WIN_W, BPP))
 np_path = np.frombuffer(data_path, dtype=np.uint8).reshape((WIN_H, WIN_W, BPP))
 
-_anim_state = {
+
+class AnimState(TypedDict, total=False):
+    active: bool
+    segments: list[tuple[int, int, int, int, int]]
+    index: int
+    color_offset: int
+    maze: MazeGenerator
+
+
+_anim_state: AnimState = {
     "active": False,
     "segments": [],
     "index": 0,
@@ -31,10 +43,11 @@ _anim_state = {
 }
 
 
-def close_win(param): os._exit(0)
+def close_win(param: Any) -> None:
+    os._exit(0)
 
 
-def setup_and_run(maze, regenerator):
+def setup_and_run(maze: MazeGenerator, regenerator: Callable[[], MazeGenerator]) -> None:
     state = {
         "maze": maze,
         "regenerator": regenerator,
@@ -46,7 +59,7 @@ def setup_and_run(maze, regenerator):
     app.mlx_loop(mlx_ptr)
 
 
-def key_hook(keycode, param):
+def key_hook(keycode: int, param: dict[str, Any]) -> None:
     state = param
     regenerator = state["regenerator"]
 
@@ -57,14 +70,13 @@ def key_hook(keycode, param):
         destroymaze()
         clearpath(state["maze"])
         state["maze"] = regenerator()
-        drawmaze(state["maze"], leprechaun = 0)
+        drawmaze(state["maze"], leprechaun=0)
     if keycode == 50:
         _anim_state["active"] = False
         clearpath(state["maze"])
     if keycode == 51:
         _anim_state["active"] = False
-        destroymaze()
-        drawmaze(state["maze"], leprechaun = 0)
+        drawmaze(state["maze"], leprechaun=0)
     if keycode == 52:
         clearpath(state["maze"])
         _start_path_animation(state["maze"], leprechaun)
@@ -73,15 +85,16 @@ def key_hook(keycode, param):
         destroymaze()
         clearpath(state["maze"])
         state["maze"] = regenerator()
-        drawmaze(state["maze"], leprechaun = 1)
-        _start_path_animation(state["maze"], leprechaun = 1)
-   
+        drawmaze(state["maze"], leprechaun=1)
+
 
 _hook_ref = key_hook
 
 
-def drawmaze(generated_maze, leprechaun):
+def drawmaze(generated_maze: MazeGenerator, leprechaun: int) -> None:
     size = 15
+    offset_x = WIN_W // 2 - generated_maze.width * size // 2
+    offset_y = WIN_H // 2 - generated_maze.height * size // 2
     color = rainbow(random.randint(0, 255), random.randint(0, 255))
     drawentry_exit(generated_maze)
     for y in range(generated_maze.height):
@@ -90,19 +103,17 @@ def drawmaze(generated_maze, leprechaun):
             if leprechaun == 0:
                 draw_cell(x, y, size, cell_variants[cell_value], color)
             else:
-                 draw_cell(x, y, size, cell_variants[cell_value], color= rainbow(x,y))
-
-
-    draw_42(generated_maze)
-    offset_x = WIN_W // 2 - generated_maze.width * size // 2
-    offset_y = WIN_H // 2 - generated_maze.height * size // 2
-    app.mlx_put_image_to_window(mlx_ptr, win_ptr, img_path, 0, 0)
-    app.mlx_put_image_to_window(mlx_ptr, win_ptr, img_maze, offset_x, offset_y)
+                draw_cell(
+                    x, y, size, cell_variants[cell_value], color=rainbow(x, y))
     app.mlx_string_put(
         mlx_ptr, win_ptr,
-        WIN_W // 2 - len("Press 1 regenerate | 2 clear path | 3 recolor | 4 animate path | 5 leprechaun") * 5,
-        WIN_H // 2 - generated_maze.height * size // 2 - size * 2,
+        WIN_W // 2 -
+        len("Press 1 regenerate | 2 clear path | 3 recolor | 4 animate path | 5 leprechaun") * 5,
+        offset_y - size * 2,
         0xFFFFFFFF, "Press 1 regenerate | 2 clear path | 3 recolor | 4 animate path | 5 leprechaun")
+    draw_42(generated_maze)
+    app.mlx_put_image_to_window(mlx_ptr, win_ptr, img_path, 0, 0)
+    app.mlx_put_image_to_window(mlx_ptr, win_ptr, img_maze, offset_x, offset_y)
     print("Done!")
 
 
@@ -126,7 +137,7 @@ cell_variants = {
 }
 
 
-def rainbow(x, y):
+def rainbow(x: float, y: float) -> int:
     scale = 0.05
     t = x + y
     r = int(127 + 127 * math.sin(scale * t))
@@ -135,7 +146,7 @@ def rainbow(x, y):
     return (0xFF << 24) | (r << 16) | (g << 8) | b
 
 
-def color_to_rgba(color):
+def color_to_rgba(color: int) -> np.ndarray:
     return np.array([
         color & 0xFF,
         (color >> 8) & 0xFF,
@@ -144,35 +155,39 @@ def color_to_rgba(color):
     ], dtype=np.uint8)
 
 
-def put_pixel(x, y, color):
+def put_pixel(x: int, y: int, color: int) -> None:
     if x < 0 or x >= WIN_W or y < 0 or y >= WIN_H:
         return
     np_maze[y, x] = color_to_rgba(color)
 
 
-def put_pixel_path(x, y, color):
+def put_pixel_path(x: int, y: int, color: int) -> None:
     if x < 0 or x >= WIN_W or y < 0 or y >= WIN_H:
         return
     np_path[y, x] = color_to_rgba(color)
 
 
-def fill_rect_maze(x, y, w, h, color):
-    x0 = max(x, 0); y0 = max(y, 0)
-    x1 = min(x + w, WIN_W); y1 = min(y + h, WIN_H)
+def fill_rect_maze(x: int, y: int, w: int, h: int, color: int) -> None:
+    x0 = max(x, 0)
+    y0 = max(y, 0)
+    x1 = min(x + w, WIN_W)
+    y1 = min(y + h, WIN_H)
     if x1 <= x0 or y1 <= y0:
         return
     np_maze[y0:y1, x0:x1] = color_to_rgba(color)
 
 
-def fill_rect_path(x, y, w, h, color):
-    x0 = max(x, 0); y0 = max(y, 0)
-    x1 = min(x + w, WIN_W); y1 = min(y + h, WIN_H)
+def fill_rect_path(x: int, y: int, w: int, h: int, color: int) -> None:
+    x0 = max(x, 0)
+    y0 = max(y, 0)
+    x1 = min(x + w, WIN_W)
+    y1 = min(y + h, WIN_H)
     if x1 <= x0 or y1 <= y0:
         return
     np_path[y0:y1, x0:x1] = color_to_rgba(color)
 
 
-def draw_cell(x, y, size, cell, color):
+def draw_cell(x: int, y: int, size: int, cell: dict[str, bool], color: int) -> None:
     px = x * size
     py = y * size
     thickness = 3
@@ -187,7 +202,7 @@ def draw_cell(x, y, size, cell, color):
         fill_rect_maze(px + size, py, thickness, size + thickness, color)
 
 
-def draw_cell_42(x, y, size):
+def draw_cell_42(x: int, y: int, size: int) -> None:
     px = x * size
     py = y * size
     color = 0xFFFFFFFF
@@ -199,7 +214,7 @@ def draw_cell_42(x, y, size):
     fill_rect_maze(px + size, py, thickness, size + thickness, color)
 
 
-def draw_42(generated_maze):
+def draw_42(generated_maze: MazeGenerator) -> None:
     size = 15
     for y in range(generated_maze.height):
         for x in range(generated_maze.width):
@@ -207,24 +222,26 @@ def draw_42(generated_maze):
                 draw_cell_42(x, y, size)
 
 
-def draw_line_thick(x0, y0, x1, y1, color, thickness=3):
+def draw_line_thick(x0: int, y0: int, x1: int, y1: int, color: int, thickness: int = 3) -> None:
     rgba = color_to_rgba(color)
     if x0 == x1:
         ya, yb = (min(y0, y1), max(y0, y1))
         x_a = max(x0 - thickness, 1)
         x_b = min(x0 + thickness + 5, WIN_W)
-        ya = max(ya, 0); yb = min(yb + 5, WIN_H)
+        ya = max(ya, 0)
+        yb = min(yb + 5, WIN_H)
         np_path[ya:yb, x_a:x_b] = rgba
     else:
         xa, xb = (min(x0, x1), max(x0, x1))
         y_a = max(y0 - thickness, 0)
         y_b = min(y0 + thickness + 5, WIN_H)
-        xa = max(xa, 0); xb = min(xb + 6, WIN_W)
+        xa = max(xa, 0)
+        xb = min(xb + 6, WIN_W)
 
         np_path[y_a:y_b, xa:xb] = rgba
 
 
-def _build_segments(generated_maze, leprechaun):
+def _build_segments(generated_maze: MazeGenerator, leprechaun: int) -> list[tuple[int, int, int, int, int]]:
     size = 15
     wall_gap = 3
     offset_x = WIN_W // 2 - generated_maze.width * size // 2
@@ -242,32 +259,36 @@ def _build_segments(generated_maze, leprechaun):
 
         if leprechaun == 0:
             color = rainbow(i * 0.25, 0)
-        else :
+        else:
             color = rainbow(1, 0)  # dégradé arc-en-ciel le long du chemin
 
         if x0 == x1:
             if py1 > py0:
-                py0 += wall_gap; py1 -= wall_gap
+                py0 += wall_gap
+                py1 -= wall_gap
             else:
-                py0 -= wall_gap; py1 += wall_gap
+                py0 -= wall_gap
+                py1 += wall_gap
         else:  # horizontal
             if px1 > px0:
-                px0 += wall_gap; px1 -= wall_gap
+                px0 += wall_gap
+                px1 -= wall_gap
             else:
-                px0 -= wall_gap; px1 += wall_gap
+                px0 -= wall_gap
+                px1 += wall_gap
 
         segments.append((px0, py0, px1, py1, color))
 
     return segments
 
 
-def drawpath(generated_maze,leprechaun):
+def drawpath(generated_maze: MazeGenerator, leprechaun: int) -> None:
     segments = _build_segments(generated_maze, leprechaun)
     for px0, py0, px1, py1, color in segments:
         draw_line_thick(px0, py0, px1, py1, color, thickness=2)
 
 
-def _start_path_animation(maze, leprechaun):
+def _start_path_animation(maze: MazeGenerator, leprechaun: int) -> None:
     segments = _build_segments(maze, leprechaun)
     _anim_state["active"] = True
     _anim_state["segments"] = segments
@@ -275,7 +296,7 @@ def _start_path_animation(maze, leprechaun):
     _anim_state["maze"] = maze
 
 
-def _loop_hook(param):
+def _loop_hook(param: dict[str, Any]) -> int:
     if not _anim_state["active"]:
         return 0
     maze = _anim_state["maze"]
@@ -307,7 +328,7 @@ def _loop_hook(param):
 _loop_hook_ref = _loop_hook
 
 
-def draw_cell_path(x, y, size, path_color):
+def draw_cell_path(x: int, y: int, size: int, path_color: int) -> None:
     if path_color == 0:
         color = 0xFFF000FF
     elif path_color == 1:
@@ -317,13 +338,13 @@ def draw_cell_path(x, y, size, path_color):
     fill_rect_path(x - size // 2, y - size // 2, size, size, color)
 
 
-def putpath(x, y, size, offset_x, offset_y, path_color):
+def putpath(x: int, y: int, size: int, offset_x: int, offset_y: int, path_color: int) -> None:
     px = x * size + offset_x + size // 2
     py = y * size + offset_y + size // 2
     draw_cell_path(px, py, size // 2, path_color)
 
 
-def drawentry_exit(generated_maze):
+def drawentry_exit(generated_maze: MazeGenerator) -> None:
     size = 15
     offset_x = WIN_W // 2 - generated_maze.width * size // 2
     offset_y = WIN_H // 2 - generated_maze.height * size // 2
@@ -333,13 +354,12 @@ def drawentry_exit(generated_maze):
     putpath(exit_x, exit_y, size, offset_x, offset_y, path_color=2)
 
 
-
-def destroymaze():
+def destroymaze() -> None:
     app.mlx_clear_window(mlx_ptr, win_ptr)
     np_maze[:] = 0
 
 
-def clearpath(maze):
+def clearpath(maze: MazeGenerator) -> None:
     np_path[:] = 0
     size = 15
     offset_x = WIN_W // 2 - maze.width * size // 2
@@ -350,10 +370,11 @@ def clearpath(maze):
     app.mlx_put_image_to_window(mlx_ptr, win_ptr, img_path, 0, 0)
     app.mlx_string_put(
         mlx_ptr, win_ptr,
-        WIN_W // 2 - len("Press 1 regenerate | 2 clear path | 3 recolor | 4 animate path | 5 leprechaun") * 5,
+        WIN_W // 2 -
+        len("Press 1 regenerate | 2 clear path | 3 recolor | 4 animate path | 5 leprechaun") * 5,
         offset_y - size * 2,
         0xFFFFFFFF, "Press 1 regenerate | 2 clear path | 3 recolor | 4 animate path | 5 leprechaun")
 
 
-def loop_hook(param):
+def loop_hook(param: Any) -> int:
     return 0
