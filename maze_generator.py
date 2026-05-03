@@ -3,7 +3,7 @@ from typing import Callable
 import random
 import sys
 
-from test_mlx import setup_and_run
+from maze_mlx import setup_and_run
 sys.setrecursionlimit(99999999)
 
 
@@ -342,7 +342,7 @@ def main() -> None:
         bfs.solve_maze()
         generate_output_file(maze, config.OUTPUT_FILE, cardinal_path(maze))
         regenerator = maze_regenerator(config)
-        from test_mlx import setup_and_run
+        from maze_mlx import setup_and_run
         setup_and_run(maze, regenerator)
     except FileNotFoundError:
         print(f"File {file} not found")
